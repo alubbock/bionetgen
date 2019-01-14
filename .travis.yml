@@ -1,21 +1,51 @@
 os:
-- osx
-- linux
+  - linux
+  - osx
+
 language: c++
+python:
+  - '2.7'
+addons:
+  apt:
+    packages:
+      - python-pip
 sudo: false
-notifications:
-  slack: faederlab:l0waIGp58v8ZV74N7QmXGoWs
+
+branches:
+  only:
+    - master
+
+-notifications:   
+   slack: 
+     rooms:
+       - faederlab:l0waIGp58v8ZV74N7QmXGoWs      
+     template:
+       - "BioNetGen build: %{result} in %{duration}"
+       - "Build: <%{build_url}|#%{build_number}> (<%{compare_url}|%{commit}>)    Author: %{author}"
+       - "Build details:  %{build_url} "
+
 script:
-- cd ./bng2/Network3 && mkdir -p m4 && cd .. && perl make_dist.pl --build --validate
-before_deploy:
-- cd BioNetGen-2.3.0/Network3 && make clean && cd ../../.. && mkdir dist && mv ./bng2/BioNetGen-2.3.0 ./dist/$TRAVIS_OS_NAME && cd dist && tar cf $TRAVIS_OS_NAME.tar $TRAVIS_OS_NAME && gzip $TRAVIS_OS_NAME.tar && rm -rf $TRAVIS_OS_NAME && cd ..
+  - cd ./bng2
+  # build atomizer (a little less easy...)
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get install -y python3-dev; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get install -y python3.4-venv; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew upgrade python; fi
+  # build sbmltranslator, nfsim, distribution and validate
+  - make dist
+  - "mv ./BioNetGen-2.4.0.tgz ./BioNetGen-2.4.0-${TRAVIS_OS_NAME}.tgz"
+  - make test
+  - cd ..
+
 deploy:
-  provider: s3
-  access_key_id: AKIAJPQVKWM4FKVDRPZA
-  bucket: bionetgen
+  provider: bintray
+  file: "./bintray.json"
+  user: jczech
+  key:
+    # If you need to regenrate this for some reason, here's what you do:
+    # travis encrypt <YOUR BINTRAY API KEY> --add deploy.key
+    # Get BINTRAY API KEY from https://bintray.com/profile/edit under "API Key" section
+    secure: Fy2jOUE+HwCMo219mmdu9p0l/+p28DQ0VQORhER6xan59U4pMYYWeNZ1g1YXFsDulEcedMNqbcI2Voeh5U8m9evsIanKp7/181TZ6ZX0K1kdpPuUmtuAPTRMVz7u1cYVgk2nzsBGI1OAj/guUThfCQBUumrJp52zB28dnlBiAwFPf1neO8M9khqRjzx98KCj2p4lMTj9z7KLSehtqNpMRU5bo+HaWca5XyKHcetRL0qpwRVhb0TcrL9z9ryCD4aXeRx3A3f2KQBQjV67F2xXbHLvljUdKW20nLQPwtFrRHn2HCEkYVZHq5zqsPlc1iDV6irDNbno+XHRpigriAoixx2C5Xb5Ah5+qD61eG719OXab5eYG/dye9mqjvPojwHN5Gd53sRbI707w3rT1YbqeN7wnEYHK7lgkyCx1D9vInp0THrLxyC/rJ0R+xneK7odHrWhLNtQWE3ZV9adDFrZuNVn3X28iJDWyfxNDgEoffZ9QSuinWlv/ITK+kYYYkQT73gH0QEtQC5Yzby73w1lK/SRbJeyBUYvR1xXKev8ToSD84VL3yMOz4Mi2ouRmJYmIlJiuv+q5ibNduD9CCi1t0arsPG15PTEaKAgQ8BELDO3V5HQkjM//4ftrchNW3WmiPwNwMisP8UDi63kS3BGr1v4QWYXmxCJu0WyF9pH+2c=
   skip_cleanup: true
-  local_dir: "dist"
   on:
-    branch: release
-  secret_access_key:
-    secure: hmR9Krh4wlbzaGc8o9QTsi8RSujHUzA//7LcIJ7ZPannWCXrKTYwuVrdhakhJTtD9WN/jgDNp5Axolt+EiuehnkLdvhI+OXsQV1EazFsgNtZonA+FO0Uv+E6WN3A44fQ5EzPf49aZMi8BRpz+bsS7/y/TcirhOYqfmtHcWwk0cr2kfvtm6lJGjswLkbH0X7NxDXYK9er0hjYHxzh+dnlzKGkGCAEO1SdFJaWOdJ9I0+Uwnu6GA/lI0pFSwWjcCafE2BADw7jp5XGc+NRpE5v2Czo7+yCw1Km1vxZSqGLTBgQ3KSNOHpE5RW7BQpwXVKecwfO93TSqFT1vwHBwKSLrSsQlHTls6k5+izETSBbNyWpP5UL34k0Ta+H/mhNTYYyuuYB31Ikdac/2krOPble2u61ZgvmGmkEm1jRBAocBvYSnRf7vBXm1Z5DPbKCvysatk/FNkvq5L/3XvFpkQMOFIowXLu1t8z22z0UycWlf0hrrQIJEQQ8H+JDyYQkKK5yNIX8FUUV70QHVJ1qJ3aYJDtKEuLBXSuhXWC39gXbD2O0MQeUCe5rfX79/basMlQuKY6hdYA7xK10bPS6/Y04YLVSFF+H0se0eCpkaaOYSScAPgcdcxyJF+XVvNXJ1LwlGZmuzRTfuGzcP4Q1CdHi9rNankLTR4vPJYNm+45EZYg=
+    all_branches: true

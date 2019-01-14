@@ -1,9 +1,23 @@
 CHANGES to BioNetGen
-updated 20 April 2017
+updated 23 October 2018
 https://github.com/RuleWorld/bionetgen/
 
+== BioNetGen-2.4.0 ==
+
+==== New Features ====
+* Heterogeneous adaptive scaling method is implemented
+* Support for exporting multi state and multi component SBML files added
+
+==== Minor changes ===
+* Reworked the build process and added instructions
+
+==== Bug Fixes ====
+* Small change to <big><tt>Expression::getName()</tt></big> to not create a new local function if the rate law already starts with the <big><tt>_rateLaw</tt></big> prefix. This prevents BNG from continually making new functions every time a model is read back in.
+* Fixed a bug with reactants or the products that are just "0" not being correctly written in the reactions block of output .net files.
+
+== BioNetGen-2.3.1 ==
+
 == BioNetGen-2.3.0 ==
-'''''date tbd'''''
 
 ==== New Features ====
 * Show graph automorphisms and statistical factor calculations for rules and reactions: BNG2.pl model.bngl --write_autos (or) BNG2.pl model.bngl --autos
@@ -23,7 +37,7 @@ https://github.com/RuleWorld/bionetgen/
 * BioNetGen will now automatically run the generate_network command if one of simulate_pla/simulate_ode/simulate_ssa methods are called and a network wasn't loaded into the system otherwise
 * Dangling bonds graph specifications of the kind A(b!1) are no longer allowed.
 * Added support for the <big><tt>atomize</tt></big> and <big><tt>blocks</tt></big> arguments of the <big><tt>readFile</tt></big> action to the BNGConsole <big><tt>load</tt></big> command, e.g., <big><tt>load path_to_model/sbml_model.xml --atomize 1</tt></big>
-* Added support for all built-in functions to <big><tt>writeMfile</tt></big>.
+* Added support for all built-in functions to <big><tt>writeMfile</tt></big> and <big><tt>writeMexfile</tt></big>.
 
 ==== Bug Fixes ====
 * Fixed a bug where <big><tt>resetParameters</tt></big> was not restoring parameters to their original values after calls to <big><tt>setParameter</tt></big>.

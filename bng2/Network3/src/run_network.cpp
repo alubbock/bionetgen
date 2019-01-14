@@ -119,10 +119,12 @@ int main(int argc, char *argv[]){
 //  extern int optind, opterr;
     //
     // Allowed propagator types
-    enum {SSA, CVODE, EULER, RKCS, PLA};
+    enum {SSA, CVODE, EULER, RKCS, PLA, HAS};
     int propagator = CVODE;
     int SOLVER = DENSE;
     int outtime = -1;
+    double scalelevel = 0.0;
+    bool pScaleChecker = false;
     //
     double maxSteps = INFINITY;//LONG_MAX;//-1;
     double stepInterval = INFINITY;//LONG_MAX;// -1;
@@ -189,7 +191,7 @@ int main(int argc, char *argv[]){
     		outpre = argv[iarg++];
     		break;
     	case 'p':
-    		if (strcmp(argv[iarg],"ssa") == 0) propagator= SSA;
+    		if (strcmp(argv[iarg],"ssa") == 0 || strcmp(argv[iarg],"has") == 0) propagator= SSA;
     		else if (strcmp(argv[iarg],"cvode") == 0) propagator= CVODE;
     		else if (strcmp(argv[iarg],"euler") == 0) propagator= EULER;
     		else if (strcmp(argv[iarg],"rkcs") == 0) propagator= RKCS;
@@ -271,6 +273,23 @@ int main(int argc, char *argv[]){
 			else if (long_opt == "pla_output"){
 				if (atoi(argv[iarg]) > 0){
 					additional_pla_output = true;
+				}
+			}
+			else if (long_opt == "scalelevel"){
+                scalelevel = rint(atof(argv[iarg]));
+				if (scalelevel <= 1.0){
+                    cout << "Scaling target is too small (<= 1), using SSA without any scaling" << endl;
+                    propagator = SSA;
+				}
+                else {
+                    propagator = HAS;
+                    cout << "Using scaling method to accelerate simulation" << endl;
+                }
+			}
+			else if (long_opt == "check_product_scale"){
+				if (atoi(argv[iarg]) != 0){
+                    cout << "The heterogeneous adaptive scaling method is also checking the scale of products (right hand side)" << endl;
+                    pScaleChecker = true;
 				}
 			}
 			else if (long_opt == "stop_cond"){
@@ -384,7 +403,8 @@ int main(int argc, char *argv[]){
 	}
 
 	/* Assign network_name based on netfile_name */
-	network_name = chop_suffix(netfile_name,".net");
+	network_name = strdup(netfile_name);
+	chop_suffix(network_name,".net");
 	if (!outpre){
 		outpre = network_name;
 	}
@@ -392,11 +412,7 @@ int main(int argc, char *argv[]){
 	/* Rate constants and concentration parameters should now be placed in the parameters block. */
 	net_line_number = 0;
 	rates = read_Elt_array(netfile, &net_line_number, (char*)"parameters", &n_read, 0x0);
-	fprintf(stdout, "Read %d parameters\n", n_read);
-//	if (n_read < 1) {
-//		fprintf(stderr,"ERROR: Reaction network must have parameters defined to be used as rate constants.\n");
-//		exit(1);
-//	}
+	fprintf(stdout, "Read %d parameters from %s\n", n_read, netfile_name);
 	rewind(netfile);
 	net_line_number = 0;
 
@@ -405,7 +421,9 @@ int main(int argc, char *argv[]){
     	fprintf(stderr,"ERROR: Couldn't read rates array.\n");
     	exit(1);
     }
-    fprintf(stdout, "Read %d species\n", n_read);
+    fprintf(stdout, "Read %d species from %s\n", n_read, netfile_name);
+	rewind(netfile);
+	net_line_number = 0;
 
 	/* Read optional groups */
 	if (group_input_file_name){
@@ -423,15 +441,11 @@ int main(int argc, char *argv[]){
     map<string, double*> param_map = init_param_map(rates,spec_groups);
     map<string, int> observ_index_map = init_observ_index_map(spec_groups);
     map<string, int> param_index_map = init_param_index_map(rates);
-//    vector<vector<int> > func_observ_depend;
-//    vector<vector<int> > func_param_depend;
 
-    char* netfile_name_tmp = netfile_name; 
-    sprintf(netfile_name_tmp, "%s%s", netfile_name_tmp, ".net");
-    read_functions_array(netfile_name_tmp,rates,param_map,param_index_map,observ_index_map,&t);
+    read_functions_array(netfile_name,rates,param_map,param_index_map,observ_index_map,&t);
     int n_func = network.functions.size();
     if (n_func > 0) n_func--; // Subtract off 'time' function
-    cout << "Read " << n_func << " function(s)" << endl;
+    cout << "Read " << n_func << " function(s) from " << netfile_name << endl;
 	if (!rates){ // Error if the 'rates' array doesn't exist (means 0 parameters, 0 functions)
 		fprintf(stderr,"ERROR: Reaction network must have parameters and/or functions defined to be used as rate laws.\n");
 		exit(1);
@@ -440,9 +454,6 @@ int main(int argc, char *argv[]){
     // Create stop condition
 	process_function_names(stop_string); // Remove parentheses from variable names
 	vector<string> variable_names = find_variables(stop_string); // Extract variable names
-//	size_t found;
-//	while ((found = stop_string.find("&&")) != string::npos) stop_string.replace(found,2,"and"); // Replace && with 'and'
-//	while ((found = stop_string.find("||")) != string::npos) stop_string.replace(found,2,"or");  // Replace || with 'or'
 	for (unsigned int i=0;i < variable_names.size();i++){
 		// Error check
 		if (param_map.find(variable_names[i]) == param_map.end()) {
@@ -452,19 +463,17 @@ int main(int argc, char *argv[]){
 		}
 		// Define variable
 		else {
-//			cout << variable_names[i] << " = " << *param_map[variable_names[i]] << endl;
 			stop_condition.DefineVar(_T(variable_names[i]),param_map[variable_names[i]]);
 		}
 	}
 	stop_condition.SetExpr(stop_string);
 
     /* Read reactions */
-//	if (!(reactions = read_Rxn_array(netfile,&net_line_number,&n_read,species,rates,network.is_func_map,remove_zero))){
 	if (!(reactions = read_Rxn_array(netfile,&net_line_number,&n_read,species,rates,network.is_func_map))){
 		fprintf(stderr, "ERROR: No reactions in the network.\n");
 		exit(1);
 	}
-	fprintf(stdout, "Read %d reaction(s)\n", n_read);
+	fprintf(stdout, "Read %d reaction(s) from %s\n", n_read, netfile_name);
 	if (remove_zero) {
 		remove_zero_rate_rxns(&reactions, rates);
 		int n_rxn = 0;
@@ -490,7 +499,7 @@ int main(int argc, char *argv[]){
 	init_network(reactions, rates, species, spec_groups, network_name);
 
 	// Round species populations if propagator is SSA or PLA
-	if (propagator == SSA || propagator == PLA){
+	if (propagator == SSA || propagator == PLA || propagator == HAS){
 		for (int i=0;i < network.species->n_elt;i++) {
 			network.species->elt[i]->val = floor(network.species->elt[i]->val + 0.5);
 		}
@@ -499,6 +508,10 @@ int main(int argc, char *argv[]){
 	/* Initialize SSA */
 	if (propagator == SSA){
 		init_gillespie_direct_network(gillespie_update_interval,seed);
+	}
+    /* Initialize HAS */
+	if (propagator == HAS){
+		init_adaptive_scaling_network(gillespie_update_interval,seed,scalelevel,pScaleChecker);
 	}
 
 	/* Save network to file */
@@ -561,7 +574,7 @@ int main(int argc, char *argv[]){
 	if (print_flux){
 		flux_file = init_print_flux_network(outpre);
 		int discrete = 0;
-		if (propagator == SSA || propagator == PLA) discrete = 1;
+		if (propagator == SSA || propagator == PLA || propagator == HAS) discrete = 1;
 		print_flux_network(flux_file,t,discrete);
 	}
 
@@ -743,6 +756,22 @@ int main(int argc, char *argv[]){
 						);
 			}
 		break;
+		case HAS:
+			fprintf(stdout, "Stochastic simulation using heterogenous adaptive scaling method\n");
+			if (verbose){
+				fprintf(stdout, "%15s %8s %12s %7s %7s %10s %7s\n", "time", "n_steps", "n_rate_calls",
+								 "% spec", "% rxn", "n_species", "n_rxns");
+				fprintf(stdout, "%15.6f %8.0f %12d %7.3f %7.3f %10d %7d\n",
+						t,
+						gillespie_n_steps() - n_steps_last,
+						n_rate_calls_network() - (int)n_rate_calls_last,
+						100 * gillespie_frac_species_active(),
+						100 * gillespie_frac_rxns_active(),
+						n_species_network(),
+						n_rxns_network()
+						);
+			}
+		break;
 		case CVODE:
 			fprintf(stdout, "Propagating with cvode");
 			if (SOLVER == GMRES) fprintf(stdout, " using GMRES\n");
@@ -824,6 +853,43 @@ int main(int argc, char *argv[]){
 					forceQuit = true;
 					forceQuit_message = "Maximum step limit (" + Util::toString(maxSteps) +
 							") reached in Gillespie simulation.";
+				}
+				break;
+			case HAS:
+				if (gillespie_n_steps() >= stepLimit - network3::TOL){
+					// Error check
+					if (gillespie_n_steps() > stepLimit + network3::TOL){
+						cout << "Uh oh, step limit exceeded in HAS (step limit = " << stepLimit << ", current step = "
+							 << gillespie_n_steps() << "). This shouldn't happen. Exiting." << endl;
+						exit(1);
+					}
+					// Continue
+					stepLimit = min(stepLimit+stepInterval,maxSteps);
+				}
+				error = adaptive_scaling_network(&t, dt, scalelevel, pScaleChecker, 0x0, 0x0, stepLimit-network3::TOL,stop_condition);
+				if (verbose){
+//					fprintf(stdout, "%15.6f %8ld %12d %7.3f %7.3f %10d %7d",
+					fprintf(stdout, "%15.6f %8.0f %12d %7.3f %7.3f %10d %7d",
+							t,
+							gillespie_n_steps() - n_steps_last,
+							n_rate_calls_network() - (int)n_rate_calls_last,
+							100 * gillespie_frac_species_active(),
+							100 * gillespie_frac_rxns_active(),
+							n_species_network(),
+							n_rxns_network()
+							);
+				}
+				n_steps_last = gillespie_n_steps();
+				if (error == -1) n -= 1; // stepLimit reached in propagation
+				if (error == -2){ // Stop condition satisfied
+					forceQuit = true;
+					forceQuit_message = "Stopping condition " + stop_condition.GetExpr() +
+							"met in Gillespie simulation with heterogenous adaptive scaling.";
+				}
+				if (gillespie_n_steps() >= maxSteps - network3::TOL){ // maxSteps limit reached
+					forceQuit = true;
+					forceQuit_message = "Maximum step limit (" + Util::toString(maxSteps) +
+							") reached in Gillespie simulation with heterogenous adpative scaling.";
 				}
 				break;
 			case CVODE:
