@@ -20,19 +20,24 @@ parser is currently being developed in ANTLR.
 
 ## Installation of Distribution 
 
-Most users should simply download BioNetGen from the [releases page](https://github.com/RuleWorld/bionetgen/releases) and get the
-appropriate distribution for their OS. To install BioNetGen, unzip the
-BioNetGen distribution file, e.g.  BioNetGen-2.3-MacOSX.tar.gz, in the
-directory where you would like BioNetGen installed. 
+Please note that this is the command line interface to BioNetGen and if you are 
+new to using BioNetGen you are probably looking for the graphical user interface, 
+[RuleBender](https://github.com/RuleWorld/rulebender). For more information please 
+visit [bionetgen.org](https://bionetgen.org). 
+
+Most users should simply download BioNetGen from the [releases page](https://github.com/RuleWorld/bionetgen/releases) 
+and get the appropriate distribution for their OS. To install BioNetGen, unzip the
+BioNetGen distribution file, e.g.  BioNetGen-2.3-MacOSX.tar.gz, in the directory 
+where you would like BioNetGen installed. 
 
 ## Download Latest Test Builds
 
 These builds are the from the head of master and are not guaranteed to be
 stable. Use at your own risk.
 
-* [Linux](https://github.com/RuleWorld/bionetgen/releases/download/BioNetGen-2.4.0%2Bwin-shared-libs/BioNetGen-2.4.0+win-shared-libs-Linux.tgz)
-* [OSX](https://github.com/RuleWorld/bionetgen/releases/download/BioNetGen-2.4.0%2Bwin-shared-libs/BioNetGen-2.4.0+win-shared-libs-OSX.tgz)
-* [Windows x64](https://github.com/RuleWorld/bionetgen/releases/download/BioNetGen-2.4.0%2Bwin-shared-libs/BioNetGen-2.4.0+win-shared-libs-Win.zip)
+* [Linux](https://github.com/RuleWorld/bionetgen/releases/download/BioNetGen-2.5.0/BioNetGen-2.5.0-linux.tgz)
+* [OSX](https://github.com/RuleWorld/bionetgen/releases/download/BioNetGen-2.5.0/BioNetGen-2.5.0-mac.tgz)
+* [Windows](https://github.com/RuleWorld/bionetgen/releases/download/BioNetGen-2.5.0/BioNetGen-2.5.0-win.tgz)
 
 ## Compilation from Source
 
